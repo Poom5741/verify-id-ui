@@ -1,101 +1,107 @@
-import Image from "next/image";
+"use client";
+import { useState } from "react";
+import { createWorker } from "tesseract.js";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [file, setFile] = useState<File | null>(null); // To hold the uploaded file
+  const [status, setStatus] = useState("Not Verified"); // To display the verification status
+  const [extractedText, setExtractedText] = useState({
+    eng: "",
+    tha: "",
+  }); // To hold OCR results for both languages
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+  // Handle file upload change event
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFile(e.target.files[0]); // Get the selected file
+    }
+  };
+
+  // Function to handle document verification using two Tesseract.js workers (English and Thai)
+  const handleVerify = async () => {
+    if (!file) {
+      alert("Please upload a document first.");
+      return;
+    }
+
+    // Set status to show that OCR is in progress
+    setStatus("Performing OCR in English and Thai...");
+
+    try {
+      // Initialize two workers for both languages
+      const workerEng = await createWorker("eng"); // English OCR worker
+      const workerTha = await createWorker("tha"); // Thai OCR worker
+
+      // Load and initialize both languages
+
+      // Perform OCR in parallel for both languages
+      const [engResult, thaResult] = await Promise.all([
+        workerEng.recognize(file), // OCR in English
+        workerTha.recognize(file), // OCR in Thai
+      ]);
+
+      // Terminate both workers after OCR is complete
+      await workerEng.terminate();
+      await workerTha.terminate();
+
+      // Update the extracted text with both results
+      setExtractedText({
+        eng: engResult.data.text,
+        tha: thaResult.data.text,
+      });
+
+      setStatus("Document Verified in both languages!");
+    } catch (error) {
+      console.error("Error during OCR:", error);
+      setStatus("OCR failed.");
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+      <Card className="p-6 w-full max-w-md shadow-lg rounded-md">
+        <h1 className="text-2xl font-semibold mb-4 text-center">
+          Upload Your Document
+        </h1>
+
+        <Label htmlFor="document-upload" className="block mb-2">
+          Choose a document
+        </Label>
+        <Input
+          id="document-upload"
+          type="file"
+          onChange={handleFileChange}
+          className="mb-4"
+        />
+
+        <Button onClick={handleVerify} variant="default" className="w-full">
+          Verify Document
+        </Button>
+
+        <p className="mt-4 text-lg text-center">{status}</p>
+
+        {extractedText.eng && (
+          <div className="mt-4">
+            <h2 className="text-lg font-semibold">Extracted Text (English):</h2>
+            <p className="text-sm text-gray-600 whitespace-pre-wrap">
+              {extractedText.eng}
+            </p>
+          </div>
+        )}
+
+        {extractedText.tha && (
+          <div className="mt-4">
+            <h2 className="text-lg font-semibold">Extracted Text (Thai):</h2>
+            <p className="text-sm text-gray-600 whitespace-pre-wrap">
+              {extractedText.tha}
+            </p>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
